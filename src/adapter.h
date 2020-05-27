@@ -28,7 +28,7 @@ namespace ofxGattLib {
             if (status) {
                 ofLogError("ofxGattLib::Adapter") <<  "Failed to open adapter.";
             } else {
-                ofLogNotice("ofxGattLib::Adapter") <<  "Opened adapter [" << adapter_name << "]";
+                ofLogNotice("ofxGattLib::Adapter") <<  "Opened adapter [" << adapter_name_c << "]";
             }
         }
 
