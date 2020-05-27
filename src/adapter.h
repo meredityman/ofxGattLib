@@ -8,61 +8,49 @@
 
 namespace ofxGattLib {
 
-    struct connection_t {
-        char* addr;
-        connection_t(char* addr):
-            addr(addr){}
+    class Device {
+    public:
+
+        Device( string addr, string name);
+        ~Device();
+
+        bool connect();
+        void disconnect();
+        void discover_services();
+
+    private:
+
+        string addr;
+        string name;
+        bool bConnected;
+
+        gatt_connection_t* gatt_connection;
+        gattlib_primary_service_t* services;
+        gattlib_characteristic_t* characteristics;
+        int services_count, characteristics_count;
+	    char uuid_str[MAX_LEN_UUID_STR + 1];
     };
+
 
     class Adapter {
         typedef void (*ble_discovered_device_t)(const char* addr, const char* name);
 
     public:
 
-        static vector<connection_t> connections;
+        Adapter();
+        ~Adapter();
 
-        Adapter(){
-            const char* adapter_name_c = NULL;
-            status = gattlib_adapter_open(adapter_name_c, &adapter);
+        void scan(int timeout = BLE_SCAN_TIMEOUT);
 
-            if (status) {
-                ofLogError("ofxGattLib::Adapter") <<  "Failed to open adapter.";
-            } else {
-                ofLogNotice("ofxGattLib::Adapter") <<  "Opened adapter [" << adapter_name_c << "]";
-            }
-        }
+        bool connect(const string & addr);
 
-        void Scan(){
-	        status = gattlib_adapter_scan_enable(adapter, ble_discovered_device, BLE_SCAN_TIMEOUT, NULL /* user_data */);
-        
-            if (status) {
-                ofLogError("ofxGattLib::Scan") <<  "Scan failed!";
-            } else {
-                ofLogNotice("ofxGattLib::Scan") << "Scan succeeded.";
-            }
-
-            gattlib_adapter_scan_disable(adapter);
-        
-        }
+        static map<string, shared_ptr<Device>> devices;
 
     private: 
         void* adapter;
-        int status;
 
-        
 
-        static void ble_discovered_device(void *adapter, const char* addr, const char* name, void *user_data) {
-            int ret;
-
-            if (name) {
-                ofLogNotice("ofxGattLib::Adapter") <<  "Discovered " << addr << " " << name;
-            } else {
-                ofLogNotice("ofxGattLib::Adapter") <<  "Discovered " << addr;
-            }
-
-            connections.push_back(connection_t(strdup(addr)));
-            
-        }
+        static void ble_discovered_device(void *adapter, const char* addr, const char* name, void *user_data);
 
     };
 
