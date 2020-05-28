@@ -4,7 +4,7 @@
 void ofApp::setup(){
     ofxGattLib::Adapter adapter;
     adapter.scan();
-    adapter.connect("C9:17:95:6F:60:44");
+    adapter.connect("E8:6E:CA:B5:6B:90");
 }
 
 //--------------------------------------------------------------
