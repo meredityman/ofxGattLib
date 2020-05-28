@@ -2,6 +2,9 @@
 
 //--------------------------------------------------------------
 void ofApp::setup(){
+    ofSetLogLevel(OF_LOG_VERBOSE);
+
+
     ofxGattLib::Adapter adapter;
     adapter.scan();
     adapter.connect("E8:6E:CA:B5:6B:90");
