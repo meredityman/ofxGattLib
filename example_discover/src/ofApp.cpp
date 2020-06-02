@@ -1,13 +1,17 @@
 #include "ofApp.h"
 
+using namespace ofxGattLib;
+
 //--------------------------------------------------------------
 void ofApp::setup(){
     ofSetLogLevel(OF_LOG_VERBOSE);
 
+    //adapter.scan();
 
-    ofxGattLib::Adapter adapter;
-    adapter.scan();
-    adapter.connect("E8:6E:CA:B5:6B:90");
+    auto device = adapter.connect<Contrib::Device_miBand3>("FE:5B:3C:4F:A3:CE");
+
+
+    device->read("0x2A19");
 }
 
 //--------------------------------------------------------------
