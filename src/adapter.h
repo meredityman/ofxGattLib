@@ -1,37 +1,12 @@
 #pragma once
 #include "ofMain.h"
 #include "gattlib.h"
-
+#include "device.h"
 
 
 #define BLE_SCAN_TIMEOUT   4
 
 namespace ofxGattLib {
-
-    class Device {
-    public:
-
-        Device( string addr, string name);
-        ~Device();
-
-        bool connect();
-        void disconnect();
-        void discover_services();
-
-    private:
-
-        string addr;
-        string name;
-        bool bConnected;
-
-        gatt_connection_t* gatt_connection;
-        gattlib_primary_service_t* services;
-        gattlib_characteristic_t* characteristics;
-        int services_count, characteristics_count;
-	    char uuid_str[MAX_LEN_UUID_STR + 1];
-    };
-
-
     class Adapter {
         typedef void (*ble_discovered_device_t)(const char* addr, const char* name);
 
@@ -42,7 +17,11 @@ namespace ofxGattLib {
 
         void scan(int timeout = BLE_SCAN_TIMEOUT);
 
-        bool connect(const string & addr);
+
+        
+        template<class Device_t>
+        shared_ptr<Device_t> connect(const string & addr);
+        shared_ptr<Device> connect(const string & addr);
 
         static map<string, shared_ptr<Device>> devices;
 
@@ -54,6 +33,25 @@ namespace ofxGattLib {
 
     };
 
-    
+    template<class Device_t> 
+    shared_ptr<Device_t> Adapter::connect(const string & addr){
+        auto device_itr = devices.find(addr);
+
+        auto result = devices.insert( 
+            std::pair<string, shared_ptr<Device>>(
+                addr, 
+                std::make_shared<Device_t>(addr, "")
+            )
+        );
+
+        if(result.second){
+            device_itr = result.first;
+        } else {
+            exit(-1);
+        }
+
+        device_itr->second->connect();
+        return std::dynamic_pointer_cast<Device_t>(device_itr->second);
+    }
 
 };
