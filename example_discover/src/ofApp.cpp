@@ -6,12 +6,32 @@ using namespace ofxGattLib;
 void ofApp::setup(){
     ofSetLogLevel(OF_LOG_VERBOSE);
 
-    //adapter.scan();
+    adapter.scan();
 
-    auto device = adapter.connect<Contrib::Device_miBand3>("FE:5B:3C:4F:A3:CE");
+    auto device = adapter.connect("E8:6E:CA:B5:6B:90");
+
+	const uuid_t g_battery_level_uuid{
+		SDP_UUID16, 
+		(0x2A19)
+	};
+
+	const uuid_t g_serial_number_uuid{
+		SDP_UUID16, 
+		(0x2A24)
+	};
 
 
-    device->read("0x2A19");
+
+    //device->read(g_serial_number_uuid);
+    device->read("0000180f-0000-1000-8000-00805f9b34fb");
+
+
+    device->read("00002A19-0000-1000-8000-00805F9B34FB");
+
+
+    device->write("FB005C81-02E7-F387-1CAD-8ACD2D8DF0C8", "0x1234");
+
+    device->read("FB005C81-02E7-F387-1CAD-8ACD2D8DF0C8");
 }
 
 //--------------------------------------------------------------

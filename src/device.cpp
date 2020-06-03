@@ -2,6 +2,7 @@
 
 using namespace ofxGattLib;
 
+
 Device::Device( string addr, string name) :
 	addr(addr),
 	name(name),
@@ -29,6 +30,13 @@ bool Device::connect(){
 	}
 	bConnected = true;	
 	discover_services();
+
+	const uuid_t g_battery_level_uuid{
+		SDP_UUID16, 
+		(0x2A19)
+	};
+
+	register_notification(g_battery_level_uuid);
 	return true;
 }
 
@@ -87,33 +95,48 @@ void Device::discover_services(){
 	}
 }
 
-void Device::write(){
-    // ret = gattlib_write_char_by_uuid(connection, &g_uuid, &value_data, sizeof(value_data));
-    // if (ret != GATTLIB_SUCCESS) {
-    //     char uuid_str[MAX_LEN_UUID_STR + 1];
 
-    //     gattlib_uuid_to_string(&g_uuid, uuid_str, sizeof(uuid_str));
 
-    //     if (ret == GATTLIB_NOT_FOUND) {
-    //         fprintf(stderr, "Could not find GATT Characteristic with UUID %s. "
-    //             "You might call the program with '--gatt-discovery'.\n", uuid_str);
-    //     } else {
-    //         fprintf(stderr, "Error while writing GATT Characteristic with UUID %s (ret:%d)\n",
-    //             uuid_str, ret);
-    //     }
-    //     goto EXIT;
-    // }
+void notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
+	vector<uint8_t> values = Device::moveBuffer(data, data_length);
+	Device::printBuffer(values, "Read UUID completed");
 }
 
-void Device::read(uuid_t g_uuid){
+void Device::register_notification(const uuid_t uuid){
+	gattlib_register_notification(gatt_connection, notification_handler, NULL);
+
+	int ret = gattlib_notification_start(gatt_connection, &uuid);
+	if (ret) {
+		fprintf(stderr, "Fail to start notification.\n");
+	};
+}
+
+void Device::write(const std::string & uuid, const std::string & data){
+    uuid_t g_uuid;
+	if (gattlib_string_to_uuid(uuid.c_str(), uuid.size(), &g_uuid) < 0) {
+		ofLogError("ofxGattLib::write") << "Failed to convert UUID: " << uuid;
+		return;
+	}
+
+	return write(g_uuid, data.c_str());
+}
+
+void Device::write(uuid_t g_uuid, const char * data){
     if(!bConnected){
         ofLogError("ofxGattLib::read") << "Device not connected: " << name;
+		return;
     }
 
-    uint8_t *buffer = NULL;
-    size_t len;
+	long int value_data;
 
-    int ret = gattlib_read_char_by_uuid(gatt_connection, &g_uuid, (void **)&buffer, &len);
+	if ((strlen(data) >= 2) && (data[0] == '0') && ((data[1] == 'x') || (data[1] == 'X'))) {
+		value_data = strtol(data, NULL, 16);
+	} else {
+		value_data = strtol(data, NULL, 0);
+	}
+	printf("Value to write: 0x%lx\n", value_data);
+
+    int ret = gattlib_write_char_by_uuid(gatt_connection, &g_uuid, &value_data, sizeof(value_data));
     if (ret != GATTLIB_SUCCESS) {
         char uuid_str[MAX_LEN_UUID_STR + 1];
 
@@ -123,34 +146,80 @@ void Device::read(uuid_t g_uuid){
             fprintf(stderr, "Could not find GATT Characteristic with UUID %s. "
                 "You might call the program with '--gatt-discovery'.\n", uuid_str);
         } else {
-            fprintf(stderr, "Error while reading GATT Characteristic with UUID %s (ret:%d)\n", uuid_str, ret);
+            fprintf(stderr, "Error while writing GATT Characteristic with UUID %s (ret:%d)\n",
+                uuid_str, ret);
         }
-        return;
+    }
+}
+
+vector<uint8_t> Device::read(uuid_t g_uuid){
+    if(!bConnected){
+        ofLogError("ofxGattLib::read") << "Device not connected: " << name;
+		return vector<uint8_t>();
     }
 
+    uint8_t *buffer = nullptr;
+    size_t buffer_len;
 
-    printf("Read UUID completed: ");
-    for (int i = 0; i < len; i++) {
-        printf("%02x ", buffer[i]);
+    int ret = gattlib_read_char_by_uuid(gatt_connection, &g_uuid,  reinterpret_cast<void**>(&buffer), &buffer_len);
+    if (ret != GATTLIB_SUCCESS) {
+        char uuid_str[MAX_LEN_UUID_STR + 1];
+
+        gattlib_uuid_to_string(&g_uuid, uuid_str, sizeof(uuid_str));
+
+        if (ret == GATTLIB_NOT_FOUND) {
+            ofLogError("ofxGattLib::read") << "Could not find GATT Characteristic with UUID " << uuid_str ;
+        } else {
+            ofLogError("ofxGattLib::read") << "Error while reading GATT Characteristic with UUID " << uuid_str << "(ret:" <<  ret << ")"; 
+        }
+		
+		return vector<uint8_t>();
     }
-    printf("\n");
 
-    free(buffer);
+	vector<uint8_t> values = moveBuffer(buffer, buffer_len);
+	free(buffer);
+
+	printBuffer(values, "Read UUID completed");
+	return values;
 };
 
-void Device::read(uint32_t uuid){
+
+vector<uint8_t> Device::read(uint32_t uuid){
     uuid_t g_uuid;
     memcpy(&g_uuid.value, &uuid, sizeof(uuid));
     g_uuid.type = SDP_UUID32;
 
-    read(g_uuid);
+    return read(g_uuid);
 }
 
-void Device::read(const string & uuid){
+vector<uint8_t> Device::read(const string & uuid){
     uuid_t g_uuid;
 	if (gattlib_string_to_uuid(uuid.c_str(), uuid.size(), &g_uuid) < 0) {
 		ofLogError("ofxGattLib::read") << "Failed to convert UUID: " << uuid;
-		return;
+		return vector<uint8_t>();
 	}
-    read(g_uuid);
+    return read(g_uuid);
+}
+
+vector<uint8_t> Device::moveBuffer( const uint8_t *buffer, size_t buffer_len){
+	if(buffer_len == 1){
+		ofLogNotice() << *buffer;
+		return vector<uint8_t>();
+	} else {
+		return vector<uint8_t> (buffer, buffer + buffer_len);
+	}
+
+}
+
+void Device::printBuffer(const vector<uint8_t> & buffer, const std::string & msg){
+	ostringstream str;
+    for (const auto val : buffer ) {
+		size_t size = snprintf( nullptr, 0, "%02x ", val ) + 1;
+		if( size <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
+		std::unique_ptr<char[]> buf( new char[ size ] ); 
+		snprintf( buf.get(), size, "%02x ", val );
+		str <<  std::string( buf.get(), buf.get() + size - 1 ); 
+    }
+
+	ofLogNotice("ofxGattLib::read") << msg << "\n" << str.str();
 }

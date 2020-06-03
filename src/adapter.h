@@ -38,17 +38,18 @@ namespace ofxGattLib {
         auto device_itr = devices.find(addr);
 
         auto result = devices.insert( 
+            device_itr,
             std::pair<string, shared_ptr<Device>>(
                 addr, 
                 std::make_shared<Device_t>(addr, "")
             )
         );
 
-        if(result.second){
-            device_itr = result.first;
-        } else {
-            exit(-1);
-        }
+        // if(result.second){
+        //     device_itr = result.first;
+        // } else {
+        //     exit(-1);
+        // }
 
         device_itr->second->connect();
         return std::dynamic_pointer_cast<Device_t>(device_itr->second);
