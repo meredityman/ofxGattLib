@@ -11,7 +11,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "command": "make -j -s 2>&1 && make RunRelease",
+            "command": "cd example_discover && make  -j -s 2>&1 && make RunRelease && cd ..",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -36,7 +36,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "command": "make Debug -j -s 2>&1 || exit 1",
+            "command": "cd example_discover && make Debug -j -s 2>&1 || exit 1 && cd ..",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -61,7 +61,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "command": "make CleanDebug",
+            "command": "cd example_discover && make CleanDebug && cd ..",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -86,7 +86,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "command": "make CleanRelease",
+            "command": "cd example_discover && make CleanRelease && cd ..",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -111,7 +111,7 @@
                 "reveal": "always",
                 "panel": "shared"
             },
-            "command": "make clean",
+            "command": "cd example_discover && make clean && cd ..",
             "group": {
                 "kind": "build",
                 "isDefault": true
