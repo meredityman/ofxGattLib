@@ -14,13 +14,18 @@ const std::string Device_polarH10::UUID_DATA_MTU_CHAR{
 
 void Device_polarH10::onConnect() {
 
-    register_notification(UUID_PWD_CONTROL_POINT);
+
+    register_notification(UUID_PWD_CONTROL_POINT, &Device::nonstatic_notification_handler);
 
     getSupportedChannels();
 
     string data = "0x0102";
     write(UUID_PWD_CONTROL_POINT, data.c_str());
         
+}
+
+void Device_polarH10::onPWDControlPointNotify(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data){
+
 }
 
 void Device_polarH10::getSupportedChannels(){

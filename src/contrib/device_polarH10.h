@@ -32,6 +32,8 @@ namespace ofxGattLib::Contrib {
 
         virtual void onConnect() override;
 
+        void onPWDControlPointNotify(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data);
+
 
     private: 
 

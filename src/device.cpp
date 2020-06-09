@@ -31,6 +31,8 @@ bool Device::connect(){
 
 	discover_services();
 
+	gattlib_register_notification(gatt_connection, &Device::static_notification_handler, NULL);
+
 	onConnect();
 	return bConnected;
 }
@@ -93,32 +95,37 @@ void Device::discover_services(){
 
 
 
-void default_notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
-	vector<uint8_t> values = Device::moveBuffer(data, data_length);
-	Device::printBuffer(values, "Notification not handled");
+void Device::static_notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
+	DeviceCallbacks::call(uuid, data, data_length, user_data);
 }
 
-void Device::register_notification(uuid_t g_uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler){
-	gattlib_register_notification(gatt_connection, default_notification_handler, NULL);
+
+void Device::nonstatic_notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
+	vector<uint8_t> values = Device::moveBuffer(data, data_length);
+	Device::printBuffer(values, "Notification handled!");
+}
+
+void Device::register_notification(uuid_t g_uuid, device_event_handler_t notification_handler){
+	using namespace std::placeholders;		
+	DeviceCallbacks::registerCallback(&g_uuid, std::bind(notification_handler, this, _1, _2, _3, _4));
 
 	int ret = gattlib_notification_start(gatt_connection, &g_uuid);
 	if (ret != GATTLIB_SUCCESS) {
         char uuid_str[MAX_LEN_UUID_STR + 1];
         gattlib_uuid_to_string(&g_uuid, uuid_str, sizeof(uuid_str));
-
 		ofLogError("Device::register_notification") << "Fail to start notification. Error " <<  uuid_str;
 	} else {
 		ofLogNotice("Device::register_notification") << "Notification registered";		
 	};
 }
 
-void Device::register_notification(const std::string &  uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler){
+void Device::register_notification(const std::string &  uuid, device_event_handler_t notification_handler){
     uuid_t g_uuid;
 	if (gattlib_string_to_uuid(uuid.c_str(), uuid.size(), &g_uuid) < 0) {
 		ofLogError("ofxGattLib::read") << "Failed to convert UUID: " << uuid;
 		return;
 	}
-	return register_notification(g_uuid, device, notification_handler);
+	return register_notification(g_uuid, notification_handler);
 }
 
 void Device::write(const std::string & uuid, const std::string & data){
@@ -246,3 +253,6 @@ void Device::printBuffer(const vector<uint8_t> & buffer, const std::string & msg
 
 	ofLogNotice("ofxGattLib::read") << msg << "\n" << str.str();
 }
+
+
+DeviceCallbacks * DeviceCallbacks::instance = nullptr;
