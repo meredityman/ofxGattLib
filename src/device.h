@@ -14,11 +14,16 @@ namespace ofxGattLib {
         bool connect();
         void disconnect();
         void discover_services();
-	    void register_notification(uuid_t uuid);
+
+        virtual void onConnect(){ofLogNotice("Device::onConnect");};
+;
+	    void register_notification(const std::string &  uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler);
+	    void register_notification(uuid_t g_uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler);
 
         void write(const std::string & uuid, const std::string & data);
         void write(uuid_t g_uuid, const char * data);
-        vector<uint8_t> read(const string & uuid);
+
+        vector<uint8_t> read(const std::string & uuid);
         vector<uint8_t> read(uint32_t uuid);
         vector<uint8_t> read(uuid_t uuid);
 
@@ -35,10 +40,9 @@ namespace ofxGattLib {
         bool bConnected;
 
         gatt_connection_t* gatt_connection;
-        gattlib_primary_service_t* services;
-        gattlib_characteristic_t* characteristics;
-        int services_count, characteristics_count;
-	    char uuid_str[MAX_LEN_UUID_STR + 1];
+        vector<gattlib_primary_service_t> services;
+        vector<gattlib_characteristic_t>  characteristics;
+
     };
 
 }

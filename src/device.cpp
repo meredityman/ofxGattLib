@@ -1,4 +1,5 @@
 #include "device.h"
+#include "utils.h"
 
 using namespace ofxGattLib;
 
@@ -7,9 +8,7 @@ Device::Device( string addr, string name) :
 	addr(addr),
 	name(name),
 	bConnected(false),
-	gatt_connection(nullptr),
-	services(nullptr),
-	characteristics(nullptr)
+	gatt_connection(nullptr)
 {
 }
 		
@@ -28,16 +27,12 @@ bool Device::connect(){
 	} else {
 		ofLogNotice("ofxGattLib::connect") << "Connected to bluetooth device " << addr;
 	}
-	bConnected = true;	
+	bConnected = true;
+
 	discover_services();
 
-	const uuid_t g_battery_level_uuid{
-		SDP_UUID16, 
-		(0x2A19)
-	};
-
-	register_notification(g_battery_level_uuid);
-	return true;
+	onConnect();
+	return bConnected;
 }
 
 
@@ -51,64 +46,79 @@ void Device::disconnect(){
     } else {
         ofLogError("ofxGattLib::disconnect")   << "Succesfully disconected from " << addr << ". Error: " << ret;
     }
-
-	if(services != nullptr){
-		free(services);
-		services = nullptr;
-	}
-
-	if(characteristics != nullptr){
-		free(characteristics);
-		characteristics = nullptr;
-	}
-	services_count = 0;
-	characteristics_count = 0;
 }
 
 void Device::discover_services(){
 	int ret, i;
-	ret = gattlib_discover_primary(gatt_connection, &services, &services_count);
+	int services_count, characteristics_count;
+    gattlib_primary_service_t* _services;
+    gattlib_characteristic_t*  _characteristics;
+
+	char uuid_str[MAX_LEN_UUID_STR + 1];
+	
+	ret = gattlib_discover_primary(gatt_connection, &_services, &services_count);
 	if (ret != GATTLIB_SUCCESS) {
 		ofLogError("ofxGattLib::discover_services") << "Fail to discover primary services for " << addr;
 		return;
 	}
 
+	services.clear();
 	for (i = 0; i < services_count; i++) {
-		gattlib_uuid_to_string(&services[i].uuid, uuid_str, sizeof(uuid_str));
+		gattlib_uuid_to_string(&_services[i].uuid, uuid_str, sizeof(uuid_str));
 
 		printf("service[%d] start_handle:%02x end_handle:%02x uuid:%s\n", i,
-				services[i].attr_handle_start, services[i].attr_handle_end,
+				_services[i].attr_handle_start, _services[i].attr_handle_end,
 				uuid_str);
-	}
 
-	ret = gattlib_discover_char(gatt_connection, &characteristics, &characteristics_count);
+		services.push_back(_services[i]);
+	}
+	free(_services);
+
+	characteristics.clear();
+	ret = gattlib_discover_char(gatt_connection, &_characteristics, &characteristics_count);
 	if (ret != GATTLIB_SUCCESS) {
 		ofLogError("ofxGattLib::discover_services") << "Fail to discover characteristics for " << addr;
 		return;
 	}
 	for (i = 0; i < characteristics_count; i++) {
-		gattlib_uuid_to_string(&characteristics[i].uuid, uuid_str, sizeof(uuid_str));
+		gattlib_uuid_to_string(&_characteristics[i].uuid, uuid_str, sizeof(uuid_str));
 
-		printf("characteristic[%d] properties:%02x value_handle:%04x uuid:%s\n", i,
-				characteristics[i].properties, characteristics[i].value_handle,
-				uuid_str);
+     	characteristics.push_back(_characteristics[i]);
+
+		//_characteristics[i].value_handle
+		ofLogNotice() << getCharPropertyString(_characteristics[i].properties) << ", " << uuid_str;
 	}
+	free(_characteristics);
 }
 
 
 
-void notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
+void default_notification_handler(const uuid_t* uuid, const uint8_t* data, size_t data_length, void* user_data) {
 	vector<uint8_t> values = Device::moveBuffer(data, data_length);
-	Device::printBuffer(values, "Read UUID completed");
+	Device::printBuffer(values, "Notification not handled");
 }
 
-void Device::register_notification(const uuid_t uuid){
-	gattlib_register_notification(gatt_connection, notification_handler, NULL);
+void Device::register_notification(uuid_t g_uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler){
+	gattlib_register_notification(gatt_connection, default_notification_handler, NULL);
 
-	int ret = gattlib_notification_start(gatt_connection, &uuid);
-	if (ret) {
-		fprintf(stderr, "Fail to start notification.\n");
+	int ret = gattlib_notification_start(gatt_connection, &g_uuid);
+	if (ret != GATTLIB_SUCCESS) {
+        char uuid_str[MAX_LEN_UUID_STR + 1];
+        gattlib_uuid_to_string(&g_uuid, uuid_str, sizeof(uuid_str));
+
+		ofLogError("Device::register_notification") << "Fail to start notification. Error " <<  uuid_str;
+	} else {
+		ofLogNotice("Device::register_notification") << "Notification registered";		
 	};
+}
+
+void Device::register_notification(const std::string &  uuid, shared_ptr<Device> device, gattlib_event_handler_t notification_handler){
+    uuid_t g_uuid;
+	if (gattlib_string_to_uuid(uuid.c_str(), uuid.size(), &g_uuid) < 0) {
+		ofLogError("ofxGattLib::read") << "Failed to convert UUID: " << uuid;
+		return;
+	}
+	return register_notification(g_uuid, device, notification_handler);
 }
 
 void Device::write(const std::string & uuid, const std::string & data){
@@ -158,6 +168,19 @@ vector<uint8_t> Device::read(uuid_t g_uuid){
 		return vector<uint8_t>();
     }
 
+
+	bool bCharacteristicExists = false;
+	for(auto & characteristic : characteristics ){
+		if( gattlib_uuid_cmp( &characteristic.uuid, &g_uuid)){
+			bCharacteristicExists = true;
+			break;
+		}
+	}
+	if(!bCharacteristicExists){
+		char uuid_str[MAX_LEN_UUID_STR + 1];
+        gattlib_uuid_to_string(&g_uuid, uuid_str, sizeof(uuid_str));
+        ofLogWarning("ofxGattLib::read") << "GATT Characteristic with UUID " << uuid_str  << " may not exist.";
+	}
     uint8_t *buffer = nullptr;
     size_t buffer_len;
 
